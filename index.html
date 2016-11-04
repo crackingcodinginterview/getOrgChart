@@ -42,7 +42,7 @@
 <script id="tooltipTemplate" type="text/x-kendo-template">
     # var node = getNode(target) #
     <div id='testId' class='testClass' style='font-size:15px; color:black; background-color:white;'>
-        <p>#= foo.Title #</p>
+        <p>#= node.Title #</p>
     </div>
 </script>
 <script src="bower_components/lodash/dist/lodash.js"></script>
@@ -59,7 +59,7 @@
             visible: true,
             target: "#chart",
             filter: "g[data-node-id]",
-            content: kendo.template($("#template").html())
+            content: kendo.template($("#tooltipTemplate").html())
         };
         $scope.getNode = function($target){
             var nodeId = $target.data('nodeId');
