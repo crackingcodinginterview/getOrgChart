@@ -1,0 +1,22 @@
+{
+  "name": "DemoDeck",
+  "homepage": "https://github.com/vominhquoc/DAGK_Angular",
+  "authors": [
+    "vominhquoc <sliverwestlife4@gmail.com>"
+  ],
+  "description": "",
+  "main": "",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular": "^1.5.8",
+    "bootstrap": "^3.3.7",
+    "lodash": "^4.16.6"
+  }
+}

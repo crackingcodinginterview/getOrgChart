@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" data-ng-app="test">
+<head>
+    <meta charset="UTF-8">
+    <title>DEMO</title>
+    <link rel="stylesheet" href="js/kendo-ui/styles/kendo.common.min.css" />
+    <link rel="stylesheet" href="js/kendo-ui/styles/kendo.default.min.css" />
+    <link rel="stylesheet" href="js/kendo-ui/styles/kendo.default.mobile.min.css" />
+    <link rel="stylesheet" href="js/getorgchart/getorgchart.css" />
+    <style>
+        .get-org-chart .get-left,
+        .get-org-chart .get-right,
+        .get-org-chart .get-up, .get-down,
+        .get-org-chart .get-oc-tb,
+        g[data-btn-action]{
+            display: none !important;
+        }
+        .get-box:hover{
+            fill: red;
+        }
+    </style>
+</head>
+<body data-ng-controller="testCtrl">
+<div id="chart"
+     kendo-tooltip
+     k-target="'#chart'"
+     k-filter="'g[data-node-id]'"
+     k-content= "'theContent'"
+     >
+</div>
+<ul data-ng-if="isChartRendered"
+    kendo-context-menu
+    k-target="'#chart'"
+    k-filter="'g[data-node-id]'"
+    k-on-select="onSelect(kendoEvent)">
+    <li data-tag="add">Add Child</li>
+    <li data-tag="copy">Copy</li>
+    <li data-tag="delete">Delete</li>
+</ul>
+<script src="bower_components/lodash/dist/lodash.js"></script>
+<script src="js/jquery.js"></script>
+<script src="bower_components/angular/angular.js"></script>
+<script src="js/kendo-ui/kendo.all.js"></script>
+<script src="js/getorgchart/getorgchart.js"></script>
+<script>
+    var app = angular.module('test', ['kendo.directives']);
+    app.controller('testCtrl', function($scope, $timeout){
+        $scope.generateId = function(){
+            return new Date().getUTCMilliseconds();
+        };
+        $scope.dataSource = [
+            { id: $scope.generateId(), parentId: null, Name: 'Root Item'}
+        ];
+        $scope.onSelect = function(e) {
+            var command = $(e.item).data('tag');
+            var nodeId = $(e.target).data('nodeId');
+            switch (command.toUpperCase()){
+                case "ADD":
+                {
+                    var newNode = { id: $scope.generateId(), parentId: nodeId, Name: "New Item"};
+                    $scope.dataSource.push(newNode);
+                }
+                    break;
+
+                case "DELETE":
+                {
+                    function _deleteRecusive(nodeId){
+                        for(var i=0; i<$scope.dataSource.length; ++i){
+                            var node = $scope.dataSource[i];
+                            if(node.id === nodeId) {
+                                $scope.dataSource.splice(i, 1);
+                                --i;
+                            }
+                            else if(node.parentId === nodeId){
+                                _deleteRecusive(node.id);
+                                $scope.dataSource.splice(i, 1);
+                                --i;
+                            }
+                        }
+                    }
+                    _deleteRecusive(nodeId);
+                }
+                    break;
+
+                case "COPY":
+                {
+                    var index = _.findIndex($scope.dataSource, {id: nodeId});
+                    var newNode = { id: $scope.generateId(), parentId: $scope.dataSource[index].parentId, Name: "Copy Item"};
+                    $scope.dataSource.push(newNode);
+                }
+                    break;
+            }
+            if(!$scope.dataSource.length)
+                $scope.dataSource = [{}];
+            $scope.renderChart();
+        };
+        $scope.renderChart = function(){
+            var chart = new getOrgChart($scope.$chart, {
+                siblingSeparation: 150,
+                orientation: getOrgChart.RO_TOP_PARENT_LEFT,
+                enableEdit: false,
+                dataSource: angular.copy($scope.dataSource)
+            });
+        };
+
+        $timeout(function() {
+            $scope.$chart = document.getElementById('chart');
+            $scope.renderChart();
+            $scope.isChartRendered = true;
+        });
+    });
+</script>
+</body>
+</html>
