@@ -54,6 +54,8 @@
         $scope.onSelect = function(e) {
             var command = $(e.item).data('tag');
             var nodeId = $(e.target).data('nodeId');
+            var index = _.findIndex($scope.dataSource, {id: nodeId});
+            var node = $scope.dataSource[index];
             switch (command.toUpperCase()){
                 case "ADD":
                 {
@@ -84,9 +86,10 @@
 
                 case "COPY":
                 {
-                    var index = _.findIndex($scope.dataSource, {id: nodeId});
-                    var newNode = { id: $scope.generateId(), parentId: $scope.dataSource[index].parentId, Name: "Copy Item"};
-                    $scope.dataSource.push(newNode);
+                    if(node.parentId !== null) {
+                        var newNode = {id: node.id+1, parentId: node.parentId, Name: "Copy Item"};
+                        $scope.dataSource.push(newNode);
+                    }
                 }
                     break;
             }
