@@ -12,7 +12,8 @@
         .get-org-chart .get-right,
         .get-org-chart .get-up, .get-down,
         .get-org-chart .get-oc-tb,
-        g[data-btn-action]{
+        g[data-btn-action],
+        g[data-node-id] .get-text-0{
             display: none !important;
         }
         .get-box:hover{
@@ -22,10 +23,8 @@
 </head>
 <body data-ng-controller="testCtrl">
 <div id="chart"
-     kendo-tooltip
-     k-target="'#chart'"
-     k-filter="'g[data-node-id]'"
-     k-content= "'theContent'"
+     kendo-tooltip="tooltipInstance"
+     k-options="tooltipOptions"
      >
 </div>
 <ul data-ng-if="isChartRendered"
@@ -33,10 +32,19 @@
     k-target="'#chart'"
     k-filter="'g[data-node-id]'"
     k-on-select="onSelect(kendoEvent)">
-    <li data-tag="add">Add Child</li>
-    <li data-tag="copy">Copy</li>
-    <li data-tag="delete">Delete</li>
+    <li data-tag="view">View claim</li>
+    <li data-tag="addright">Add claim (right)</li>
+    <li data-tag="addleft">Add claim (left)</li>
+    <li data-tag="addbelow">Add claim (below)</li>
+    <li data-tag="copy">Copy claim</li>
+    <li data-tag="delete">Delete claim</li>
 </ul>
+<script id="tooltipTemplate" type="text/x-kendo-template">
+    # var node = getNode(target) #
+    <div id='testId' class='testClass' style='font-size:15px; color:black; background-color:white;'>
+        <p>#= foo.Title #</p>
+    </div>
+</script>
 <script src="bower_components/lodash/dist/lodash.js"></script>
 <script src="js/jquery.js"></script>
 <script src="bower_components/angular/angular.js"></script>
@@ -44,20 +52,81 @@
 <script src="js/getorgchart/getorgchart.js"></script>
 <script>
     var app = angular.module('test', ['kendo.directives']);
-    app.controller('testCtrl', function($scope, $timeout){
+    app.controller('testCtrl', function($scope, $timeout, $location){
+        $scope.minId = 1;
+        $scope.maxId = 10000001;
+        $scope.tooltipOptions = {
+            visible: true,
+            target: "#chart",
+            filter: "g[data-node-id]",
+            content: kendo.template($("#template").html())
+        };
+        $scope.getNode = function($target){
+            var nodeId = $target.data('nodeId');
+            return _.find($scope.dataSource, {id: nodeId});
+        };
+        window.getNode = $scope.getNode;
         $scope.generateId = function(){
-            return new Date().getUTCMilliseconds();
+            return $scope.generateIdBetween($scope.minId, $scope.maxId)
+        };
+        $scope.findMinMax = function(a, b){
+            var res = {};
+            if(a > b) {
+                res.min = b;
+                res.max = a;
+            }
+            else{
+                res.min = a;
+                res.max = b;
+            }
+            return res;
+        };
+        $scope.generateIdBetween = function(a, b){
+            var res = $scope.findMinMax(a, b);
+            var min = res.min,
+                max = res.max;
+            return Math.floor(Math.random() * (max - min)) + min;
         };
         $scope.dataSource = [
-            { id: $scope.generateId(), parentId: null, Name: 'Root Item'}
+            { id: $scope.generateId(), parentId: null, Name: 'Root Item', Title: "aaaa", HightLight: 'bbbb'}
         ];
+        $scope.copyChild = function(node, position){
+            var siblings = _.filter($scope.dataSource, { parentId: node.parentId });
+            siblings = _.sortBy(siblings, [function(o) { return o.id; }]);
+            var currentIndex = _.findIndex(siblings, {id: node.id});
+            var nextId;
+            if((position === "RIGHT" && currentIndex === siblings.length - 1) ||
+                    (position === "LEFT" && currentIndex === 0) ||
+                    siblings.length === 1){
+                if(position === "RIGHT")
+                    nextId = $scope.generateIdBetween(node.id + 1, $scope.maxId);
+                else
+                    nextId = $scope.generateIdBetween($scope.minId, node.id);
+            }
+            else {
+                var nextSiblingId;
+                if(position === "RIGHT")
+                    nextSiblingId = siblings[currentIndex + 1].id;
+                else
+                    nextSiblingId = siblings[currentIndex - 1].id;
+                nextId = $scope.generateIdBetween(node.id, nextSiblingId);
+            }
+            var newNode = {id: nextId, parentId: node.parentId, Name: "Copy Item", Title: "aaaa", HightLight: 'bbbb'};
+            $scope.dataSource.push(newNode);
+        };
+        $scope.addLeft = function(node){
+            $scope.copyChild(node, "LEFT");
+        };
+        $scope.addRight = function(node){
+            $scope.copyChild(node, "RIGHT");
+        };
         $scope.onSelect = function(e) {
             var command = $(e.item).data('tag');
             var nodeId = $(e.target).data('nodeId');
             var index = _.findIndex($scope.dataSource, {id: nodeId});
             var node = $scope.dataSource[index];
             switch (command.toUpperCase()){
-                case "ADD":
+                case "ADDBELOW":
                 {
                     var newNode = { id: $scope.generateId(), parentId: nodeId, Name: "New Item"};
                     $scope.dataSource.push(newNode);
@@ -87,10 +156,34 @@
                 case "COPY":
                 {
                     if(node.parentId !== null) {
-                        var newNode = {id: node.id+1, parentId: node.parentId, Name: "Copy Item"};
-                        $scope.dataSource.push(newNode);
+                        $scope.addRight(node);
                     }
                 }
+                    break;
+
+                case "ADDLEFT":
+                {
+                    if(node.parentId !== null) {
+                        $scope.addLeft(node);
+                    }
+                }
+                    break;
+
+                case "ADDRIGHT":
+                {
+                    if(node.parentId !== null) {
+                        $scope.addRight(node);
+                    }
+                }
+                    break;
+
+                case "VIEW":
+                {
+                    $location.path('/abc');
+                }
+                    break;
+
+                default:
                     break;
             }
             if(!$scope.dataSource.length)
@@ -99,7 +192,10 @@
         };
         $scope.renderChart = function(){
             var chart = new getOrgChart($scope.$chart, {
+                primaryFields: ["Lastname", "Title", "Name"],
+                scale: 0.5,
                 siblingSeparation: 150,
+                enableZoom: false,
                 orientation: getOrgChart.RO_TOP_PARENT_LEFT,
                 enableEdit: false,
                 dataSource: angular.copy($scope.dataSource)
