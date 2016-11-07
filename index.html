@@ -3,35 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <title>DEMO</title>
+    <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.css">
     <link rel="stylesheet" href="js/kendo-ui/styles/kendo.common.min.css" />
     <link rel="stylesheet" href="js/kendo-ui/styles/kendo.default.min.css" />
     <link rel="stylesheet" href="js/kendo-ui/styles/kendo.default.mobile.min.css" />
     <link rel="stylesheet" href="js/getorgchart/getorgchart.css" />
     <style>
+        html, body {margin: 0px; padding: 0px;height: 100%; overflow: hidden; }
+        #chart {width: 100%;height: 100%;}
         .get-org-chart .get-left,
         .get-org-chart .get-right,
         .get-org-chart .get-up, .get-down,
         .get-org-chart .get-oc-tb,
-        g[data-btn-action],
+        g[data-btn-action]{
+            display: none !important;
+        }
         g[data-node-id] .get-text-0{
             display: none !important;
         }
-        .get-box:hover{
-            fill: red;
+        #tooltip{
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #tooltip .box-item{
+            border: 1px solid #d7d7d7;
+            padding: 5px;
+            background: #fff;
+            width: 470px;
+        }
+        #tooltip .box-item .img,
+        #tooltip .box-item img,
+        #tooltip .box-item .text-more{
+            width: 100%;
+        }
+        #tooltip .box-item .text-more{
+            text-align: right;
+        }
+        p{
+            margin: 0;
+            padding: 0;
         }
     </style>
 </head>
 <body data-ng-controller="testCtrl">
-<div id="chart"
-     kendo-tooltip="tooltipInstance"
-     k-options="tooltipOptions"
-     >
+<div>
+    <button class="btn btn-primary" data-ng-click="isGuest=true">GUEST</button>
+    <button class="btn btn-primary" data-ng-click="isGuest=!isGuest">USER</button>
 </div>
-<ul data-ng-if="isChartRendered"
-    kendo-context-menu
-    k-target="'#chart'"
-    k-filter="'g[data-node-id]'"
-    k-on-select="onSelect(kendoEvent)">
+<div id="chart"
+     oncontextmenu="return false">
+</div>
+<div data-ng-show="isGuest"
+     id="tooltip">
+    <div class="box-item">
+        <div class="img"><img data-ng-src="{{node.ImageLink}}" alt=""></div>
+        <div class="text-more"><span class="desc">{{node.Footer}}</span></div>
+    </div>
+</div>
+<ul data-ng-show="!isGuest && isChartRendered"
+    kendo-context-menu="contextMenuInstance"
+    k-options="contextMenuOptions">
     <li data-tag="view">View claim</li>
     <li data-tag="addright">Add claim (right)</li>
     <li data-tag="addleft">Add claim (left)</li>
@@ -39,12 +72,6 @@
     <li data-tag="copy">Copy claim</li>
     <li data-tag="delete">Delete claim</li>
 </ul>
-<script id="tooltipTemplate" type="text/x-kendo-template">
-    # var node = getNode(target) #
-    <div id='testId' class='testClass' style='font-size:15px; color:black; background-color:white;'>
-        <p>#= node.Title #</p>
-    </div>
-</script>
 <script src="bower_components/lodash/dist/lodash.js"></script>
 <script src="js/jquery.js"></script>
 <script src="bower_components/angular/angular.js"></script>
@@ -53,19 +80,98 @@
 <script>
     var app = angular.module('test', ['kendo.directives']);
     app.controller('testCtrl', function($scope, $timeout, $location){
-        $scope.minId = 1;
-        $scope.maxId = 10000001;
-        $scope.tooltipOptions = {
-            visible: true,
-            target: "#chart",
-            filter: "g[data-node-id]",
-            content: kendo.template($("#tooltipTemplate").html())
+        $scope.initModel = function(){
+            $scope.isGuest = true;
+            $scope.minId = 1;
+            $scope.maxId = 10000001;
+            $scope.currentId;
+
+            var rootClaim = $scope.getNewClaim();
+            rootClaim.id = $scope.generateId();
+            $scope.dataSource = [
+                rootClaim
+            ];
+
+            $scope.isChartRendered = false;
+
+            $scope.$chart = $('#chart');
+            $scope.$tooltip = $('#tooltip');
+
+            $scope.chart = $scope.$chart[0];
+
+            $scope.contextMenuOptions = {
+                target: '#chart',
+                filter: 'g[data-node-id]',
+                select: $scope.onSelect
+            };
+            $scope.chartOptions = {
+                primaryFields: ["Lastname", "Title", "Name"],
+                scale: 0.5,
+                siblingSeparation: 150,
+                enableZoom: true,
+                enableEdit: false,
+                orientation: getOrgChart.RO_TOP_PARENT_LEFT,
+                dataSource: angular.copy($scope.dataSource),
+                renderNodeEvent: $scope.renderNodeEvent,
+                updatedEvent: $scope.updatedEvent,
+                insertNodeEvent: $scope.insertNodeEvent,
+                removeNodeEvent: $scope.removeNodeEvent,
+                clickNodeEvent: $scope.clickNodeEvent
+            };
         };
-        $scope.getNode = function($target){
-            var nodeId = $target.data('nodeId');
-            return _.find($scope.dataSource, {id: nodeId});
+        /*
+         *
+         * @param sender : The OrgChart Object
+         * @param args : node
+         */
+        var colors = ['#4286f4', '#d942f4', '#e8f442'];
+        $scope.renderNodeEvent = function(sender, args){
+            var rand = Math.floor(Math.random() * colors.length);
+            var hex = colors[rand];
+            args.content[1] = args.content[1].replace("rect", "rect style='fill: " + hex + "; stroke: " + hex + ";'");
         };
-        window.getNode = $scope.getNode;
+        /**
+         *
+         * @param sender : The OrgChart Object
+         * @param args : node
+         */
+        $scope.updatedEvent = function(sender, args){
+        };
+        /**
+         *
+         * @param sender : The OrgChart Object
+         * @param args : node
+         */
+        $scope.insertNodeEvent = function(sender, args){
+            var node = args.node;
+            switch($scope.command.toUpperCase()){
+                case "COPY":
+                {
+                    node.data.Title = $scope.node.data.Title;
+                }
+                    break;
+
+                case "ADDBELOW":
+                case "ADDLEFT":
+                case "ADDRIGHT":
+                {
+                    var title = window.prompt("Please enter claim title", "defaultText");
+                    if(title)
+                        node.data.Title = title
+                }
+                    break;
+            }
+        };
+        /**
+         *
+         * @param sender : The OrgChart Object
+         * @param args : node
+         */
+        $scope.removeNodeEvent = function(sender, args){
+        };
+        $scope.clickNodeEvent = function(sender, args){
+            $location.path(args.node.data.PostLink);
+        };
         $scope.generateId = function(){
             return $scope.generateIdBetween($scope.minId, $scope.maxId)
         };
@@ -84,15 +190,23 @@
         $scope.generateIdBetween = function(a, b){
             var res = $scope.findMinMax(a, b);
             var min = res.min,
-                max = res.max;
+                    max = res.max;
             return Math.floor(Math.random() * (max - min)) + min;
         };
-        $scope.dataSource = [
-            { id: $scope.generateId(), parentId: null, Name: 'Root Item', Title: "aaaa", HightLight: 'bbbb'}
-        ];
+        $scope.getNewClaim = function(){
+            return {
+                id: null,
+                parentId: null,
+                Name: 'Root Item',
+                Title: 'aaaa',
+                ImageLink: 'img/preview.png',
+                PostLink: '/aaaa',
+                Footer: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit...'
+            };
+        };
         $scope.copyChild = function(node, position){
-            var siblings = _.filter($scope.dataSource, { parentId: node.parentId });
-            siblings = _.sortBy(siblings, [function(o) { return o.id; }]);
+            var siblings = _.filter($scope.$orgChart.nodes, { pid: node.pid });
+            siblings = _.sortBy(siblings, [function(o) { return Number(o.id); }]);
             var currentIndex = _.findIndex(siblings, {id: node.id});
             var nextId;
             if((position === "RIGHT" && currentIndex === siblings.length - 1) ||
@@ -111,8 +225,7 @@
                     nextSiblingId = siblings[currentIndex - 1].id;
                 nextId = $scope.generateIdBetween(node.id, nextSiblingId);
             }
-            var newNode = {id: nextId, parentId: node.parentId, Name: "Copy Item", Title: "aaaa", HightLight: 'bbbb'};
-            $scope.dataSource.push(newNode);
+            $scope.$orgChart.insertNodeCustom(node.pid, nextId);
         };
         $scope.addLeft = function(node){
             $scope.copyChild(node, "LEFT");
@@ -121,90 +234,90 @@
             $scope.copyChild(node, "RIGHT");
         };
         $scope.onSelect = function(e) {
-            var command = $(e.item).data('tag');
+            $scope.command = $(e.item).data('tag');
             var nodeId = $(e.target).data('nodeId');
-            var index = _.findIndex($scope.dataSource, {id: nodeId});
-            var node = $scope.dataSource[index];
-            switch (command.toUpperCase()){
+            $scope.node = $scope.$orgChart.nodes[nodeId];
+            switch ($scope.command.toUpperCase()){
                 case "ADDBELOW":
                 {
-                    var newNode = { id: $scope.generateId(), parentId: nodeId, Name: "New Item", Title: "aaaa", HightLight: 'bbbb'};
-                    $scope.dataSource.push(newNode);
+                    $scope.$orgChart.insertNodeCustom(nodeId, $scope.generateId());
                 }
                     break;
 
                 case "DELETE":
                 {
-                    function _deleteRecusive(nodeId){
-                        for(var i=0; i<$scope.dataSource.length; ++i){
-                            var node = $scope.dataSource[i];
-                            if(node.id === nodeId) {
-                                $scope.dataSource.splice(i, 1);
-                                --i;
-                            }
-                            else if(node.parentId === nodeId){
-                                _deleteRecusive(node.id);
-                                $scope.dataSource.splice(i, 1);
-                                --i;
+                    function _deleteChild(nodeId){
+                        for (var prop in $scope.$orgChart.nodes) {
+                            var node = $scope.$orgChart.nodes[prop];
+                            if (node.pid === nodeId) {
+                                _deleteChild(Number(node.id));
                             }
                         }
+                        $scope.$orgChart.removeNode(nodeId);
                     }
-                    _deleteRecusive(nodeId);
+                    _deleteChild(nodeId);
                 }
                     break;
 
                 case "COPY":
                 {
-                    if(node.parentId !== null) {
-                        $scope.addRight(node);
+                    if($scope.node.pid !== null) {
+                        $scope.addRight($scope.node);
                     }
                 }
                     break;
 
                 case "ADDLEFT":
                 {
-                    if(node.parentId !== null) {
-                        $scope.addLeft(node);
+                    if($scope.node.pid !== null) {
+                        $scope.addLeft($scope.node);
                     }
                 }
                     break;
 
                 case "ADDRIGHT":
                 {
-                    if(node.parentId !== null) {
-                        $scope.addRight(node);
+                    if($scope.node.pid !== null) {
+                        $scope.addRight($scope.node);
                     }
                 }
                     break;
 
                 case "VIEW":
                 {
-                    $location.path('/abc');
+                    $location.path($scope.node.data.PostLink);
                 }
                     break;
 
                 default:
                     break;
             }
-            if(!$scope.dataSource.length)
-                $scope.dataSource = [{}];
-            $scope.renderChart();
         };
         $scope.renderChart = function(){
-            var chart = new getOrgChart($scope.$chart, {
-                primaryFields: ["Lastname", "Title", "Name"],
-                scale: 0.5,
-                siblingSeparation: 150,
-                enableZoom: false,
-                orientation: getOrgChart.RO_TOP_PARENT_LEFT,
-                enableEdit: false,
-                dataSource: angular.copy($scope.dataSource)
+            $scope.$orgChart = new getOrgChart($scope.chart, $scope.chartOptions);
+        };
+        $scope.renderTooltip = function(){
+            $scope.$chart.on('mouseover','g[data-node-id]', function(e){
+                var nodeId = $(this).data('nodeId');
+                $timeout(function(){
+                    $scope.node =  _.find($scope.dataSource, {id: nodeId});
+                });
+                $scope.$tooltip.show();
+            });
+            $scope.$chart.on('mouseout','g[data-node-id]', function(e){
+                $scope.$tooltip.hide();
+            });
+            $scope.$chart.on('mousemove','g[data-node-id]', function(e){
+                var left = e.clientX;
+                var top = e.clientY;
+                $scope.$tooltip.css({'left': left + 10 + 'px', 'top': top + 10 + 'px'});
             });
         };
 
+        $scope.initModel();
         $timeout(function() {
-            $scope.$chart = document.getElementById('chart');
             $scope.renderChart();
+            $scope.renderTooltip();
             $scope.isChartRendered = true;
         });
     });

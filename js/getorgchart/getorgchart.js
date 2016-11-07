@@ -2805,6 +2805,7 @@ getOrgChart.prototype.expandOrCollapse = function(a) {
     this.loadFromJSON(this.nodes, true)
 };
 getOrgChart.prototype.insertNode = function(d) {
+    debugger;
     var f = this;
     var e = this.nodes[d];
     this._aS = {
@@ -2831,6 +2832,35 @@ getOrgChart.prototype.insertNode = function(d) {
     });
     return c
 };
+
+getOrgChart.prototype.insertNodeCustom = function(d, b) {
+    var f = this;
+    var e = this.nodes[d];
+    this._aS = {
+        id: d,
+        old_x: e.x,
+        old_y: e.y
+    };
+    var a = {};
+    this.config.primaryFields.forEach(function(g) {
+        a[g] = g
+    });
+    var c = this._t(b, d, a, false);
+    if (!this._W("insertNodeEvent", {
+            node: c
+        })) {
+        this.removeNode(c.id);
+        return
+    }
+    c.x = e.x;
+    c.y = e.y;
+    this.loadFromJSON(this.nodes, true, function() {
+        f._W("updatedEvent")
+    });
+    return c
+};
+
+
 getOrgChart.prototype.removeNode = function(b) {
     var e = this;
     if (!this._W("removeNodeEvent", {
